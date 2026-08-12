@@ -1,0 +1,63 @@
+@startuml ParkingLot_SequenceDiagram
+title Parking Lot System — Sequence Diagram
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 5
+skinparam sequenceParticipant underline
+
+actor       User
+participant Main
+participant VehicleFactory  <<Factory>>
+participant ParkingLot      <<Singleton>>
+participant Floor
+participant EntryGate
+participant ExitGate
+participant ParkingFeeStrategy <<Strategy>>
+participant PaymentStrategy    <<Strategy>>
+participant Ticket
+participant Payment
+
+== System Setup ==
+Main -> ParkingLot       : getInstance()
+Main -> ParkingLot       : addFloor(floor1), addFloor(floor2)
+
+== Vehicle Creation (Factory Pattern) ==
+Main -> VehicleFactory   : createVehicle(CAR, "CAR123")
+VehicleFactory --> Main  : CarVehicle
+
+Main -> VehicleFactory   : createVehicle(BIKE, "BIKE456")
+VehicleFactory --> Main  : BikeVehicle
+
+== Entry Flow ==
+Main -> EntryGate        : generateTicket(car)
+EntryGate -> ParkingLot  : findAvailableSpot(CAR)
+ParkingLot -> Floor      : getAvailableSpots(CAR)
+Floor --> ParkingLot     : List<ParkingSpot>
+ParkingLot -> ParkingLot : parkingStrategy.park(availableSpots)
+ParkingLot --> EntryGate : ParkingSpot
+
+EntryGate -> ParkingSpot : parkVehicle(car)
+EntryGate -> Ticket      : new Ticket(car, spot)
+Ticket --> EntryGate     : ticket {ticketId, entryTime, spot}
+EntryGate --> Main       : Ticket
+
+== User Selects Payment at Exit ==
+User -> Main : selects "1. Credit Card" or "2. Cash"
+Main -> Main : getPaymentStrategy(choice) → CreditCard / CashPayment
+
+== Exit Flow ==
+Main -> ExitGate                : makePayment(ticket, paymentStrategy)
+ExitGate -> Ticket              : setExitTime(now)
+ExitGate -> ParkingFeeStrategy  : calculateFee(ticket)
+ParkingFeeStrategy -> Ticket    : getEntryTime(), getExitTime(), getVehicleType()
+ParkingFeeStrategy --> ExitGate : charges
+ExitGate -> Ticket              : setCharges(charges)
+ExitGate -> PaymentStrategy     : processPayment(charges)
+PaymentStrategy --> User        : "Processing payment of $X"
+ExitGate -> Ticket              : setActive(false)
+ExitGate -> ParkingSpot         : vacate()
+ExitGate -> Payment             : new Payment(charges, ticket, strategy)
+Payment --> ExitGate            : Payment receipt
+ExitGate --> Main               : Payment
+
+@enduml

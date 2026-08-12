@@ -1,0 +1,209 @@
+@startuml ParkingLot_ClassDiagram
+title Parking Lot System — Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor #F0F4FF
+    BorderColor     #2E75B6
+    FontSize        12
+}
+skinparam interface {
+    BackgroundColor #E8F8E8
+    BorderColor     #36B37E
+}
+skinparam enum {
+    BackgroundColor #FFF8E8
+    BorderColor     #FF8B00
+}
+
+' ═══════════════════════════════════════
+'  CORE
+' ═══════════════════════════════════════
+class ParkingLot <<Singleton>> {
+    - pLotId : String
+    - floors : List<Floor>
+    - entries : List<EntryGate>
+    - exits : List<ExitGate>
+    - parkingStrategy : ParkingStrategy
+    --
+    + getInstance() : ParkingLot
+    + addFloor(Floor)
+    + findAvailableSpot(VehicleType) : ParkingSpot
+    + parkVehicle(Vehicle) : ParkingSpot
+    + vacateSpot(ParkingSpot, Vehicle)
+}
+
+class Ticket {
+    - ticketId : String
+    - entryTime : LocalDateTime
+    - exitTime : LocalDateTime
+    - vehicle : Vehicle
+    - pSpaceAssigned : ParkingSpot
+    - isActive : boolean
+    - charges : double
+}
+
+' ═══════════════════════════════════════
+'  VEHICLE (Factory Pattern)
+' ═══════════════════════════════════════
+class VehicleFactory <<Factory>> {
+    + createVehicle(VehicleType, String) : Vehicle
+}
+
+class Vehicle {
+    - licensePlate : String
+    - vehicleType : VehicleType
+}
+
+class CarVehicle extends Vehicle
+class BikeVehicle extends Vehicle
+class OtherVehicle extends Vehicle
+
+enum VehicleType {
+    CAR
+    BIKE
+    OTHER
+}
+
+VehicleFactory ..> CarVehicle  : creates
+VehicleFactory ..> BikeVehicle : creates
+VehicleFactory ..> OtherVehicle : creates
+Vehicle --> VehicleType
+
+' ═══════════════════════════════════════
+'  PARKING SPOTS
+' ═══════════════════════════════════════
+class Floor {
+    - floorId : String
+    - spots : List<ParkingSpot>
+    --
+    + getAvailableSpots(VehicleType) : List<ParkingSpot>
+    + findAvailableSpot(VehicleType) : ParkingSpot
+    + addParkingSpot(ParkingSpot)
+}
+
+abstract class ParkingSpot {
+    - spotNumber : int
+    - isOccupied : boolean
+    - vehicle : Vehicle
+    - spotType : ParkingSpotType
+    --
+    + {abstract} canParkVehicle(Vehicle) : boolean
+    + parkVehicle(Vehicle)
+    + vacate()
+}
+
+class CarParkingSpot extends ParkingSpot
+class BikeParkingSpot extends ParkingSpot
+
+enum ParkingSpotType {
+    CarParking
+    BikeParking
+    OtherParking
+}
+
+ParkingSpot --> ParkingSpotType
+ParkingSpot --> Vehicle
+
+' ═══════════════════════════════════════
+'  GATES
+' ═══════════════════════════════════════
+class EntryGate {
+    - gateId : String
+    --
+    + generateTicket(Vehicle) : Ticket
+}
+
+class ExitGate {
+    - gateId : String
+    - feeStrategy : ParkingFeeStrategy
+    --
+    + makePayment(Ticket, PaymentStrategy) : Payment
+}
+
+' ═══════════════════════════════════════
+'  PARKING STRATEGY (Strategy Pattern)
+' ═══════════════════════════════════════
+interface ParkingStrategy <<Strategy>> {
+    + park(List<ParkingSpot>) : ParkingSpot
+}
+
+class NaturalOrderParking implements ParkingStrategy {
+    + park(List<ParkingSpot>) : ParkingSpot
+}
+
+' ═══════════════════════════════════════
+'  FEE STRATEGY (Strategy Pattern)
+' ═══════════════════════════════════════
+interface ParkingFeeStrategy <<Strategy>> {
+    + calculateFee(VehicleType, int, DurationType) : double
+    + calculateFee(Ticket) : double
+}
+
+class BasicHourlyRateStrategy implements ParkingFeeStrategy {
+    + calculateFee(VehicleType, int, DurationType) : double
+    + calculateFee(Ticket) : double
+}
+
+class PremiumRateStrategy implements ParkingFeeStrategy {
+    + calculateFee(VehicleType, int, DurationType) : double
+    + calculateFee(Ticket) : double
+}
+
+enum DurationType {
+    HOURS
+    DAYS
+}
+
+' ═══════════════════════════════════════
+'  PAYMENT STRATEGY (Strategy Pattern)
+' ═══════════════════════════════════════
+interface PaymentStrategy <<Strategy>> {
+    + processPayment(double)
+}
+
+class CashPayment implements PaymentStrategy {
+    + processPayment(double)
+}
+
+class CreditCard implements PaymentStrategy {
+    + processPayment(double)
+}
+
+class Payment {
+    - paymentId : String
+    - pTime : LocalDateTime
+    - amount : double
+    - ticket : Ticket
+    - paymentStrategy : PaymentStrategy
+}
+
+enum PaymentType {
+    CASH
+    CARD
+}
+
+' ═══════════════════════════════════════
+'  RELATIONSHIPS
+' ═══════════════════════════════════════
+ParkingLot "1" *-- "many" Floor         : contains
+ParkingLot "1" *-- "many" EntryGate     : has
+ParkingLot "1" *-- "many" ExitGate      : has
+ParkingLot --> ParkingStrategy          : uses
+
+Floor "1" *-- "many" ParkingSpot        : contains
+
+EntryGate ..> Ticket                    : creates
+EntryGate ..> ParkingLot               : uses
+
+ExitGate --> ParkingFeeStrategy         : uses
+ExitGate ..> Payment                   : creates
+ExitGate ..> PaymentStrategy           : uses (per call)
+
+Ticket --> Vehicle
+Ticket --> ParkingSpot
+
+Payment --> Ticket
+Payment --> PaymentStrategy
+
+@enduml
